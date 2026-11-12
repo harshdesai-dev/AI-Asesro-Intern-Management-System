@@ -1,0 +1,227 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  ADMIN
+  INTERN
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
+enum AssignmentType {
+  INDIVIDUAL
+  TEAM
+}
+
+enum AssignmentStatus {
+  ASSIGNED
+  IN_PROGRESS
+  SUBMITTED
+  APPROVED
+  NEEDS_CHANGES
+  CANCELLED
+}
+
+enum AttendanceStatus {
+  PRESENT
+  ABSENT
+  LATE
+  HALF_DAY
+}
+
+enum MeetingStatus {
+  SCHEDULED
+  COMPLETED
+  CANCELLED
+}
+
+enum MeetingAudience {
+  ALL_INTERNS
+  TEAM
+  SELECTED
+}
+
+enum MeetingAttendanceStatus {
+  PENDING
+  PRESENT
+  ABSENT
+  LATE
+}
+
+model User {
+  id                      String                @id @default(cuid())
+  name                    String
+  email                   String                @unique
+  passwordHash            String
+  role                    UserRole              @default(INTERN)
+  status                  UserStatus            @default(ACTIVE)
+  internCode              String?               @unique
+  position                String?
+  teamId                  String?
+  createdAt               DateTime              @default(now())
+  updatedAt               DateTime              @updatedAt
+
+  team                    Team?                 @relation(fields: [teamId], references: [id], onDelete: SetNull)
+  createdTasks            Task[]                @relation("TaskCreator")
+  individualAssignments  TaskAssignment[]      @relation("AssignedIntern")
+  ledAssignments          TaskAssignment[]      @relation("TeamLead")
+  assignmentMemberships  TaskAssignmentMember[]
+  reviewedAssignments     TaskAssignment[]      @relation("TaskReviewer")
+  attendanceRecords       Attendance[]           @relation("InternAttendance")
+  markedAttendance        Attendance[]           @relation("AttendanceMarker")
+  createdMeetings         Meeting[]              @relation("MeetingCreator")
+  meetingAttendance       MeetingAttendance[]    @relation("MeetingIntern")
+  markedMeetingAttendance MeetingAttendance[]    @relation("MeetingAttendanceMarker")
+
+  @@index([role, status])
+  @@index([teamId, status])
+}
+
+model Team {
+  id          String           @id @default(cuid())
+  name        String           @unique
+  description String?          @db.VarChar(500)
+  isActive    Boolean          @default(true)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  members     User[]
+  assignments TaskAssignment[]
+  meetings    Meeting[]
+}
+
+model Task {
+  id          String           @id @default(cuid())
+  title       String
+  description String           @db.Text
+  priority    TaskPriority     @default(MEDIUM)
+  deadline    DateTime?
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  createdBy   User             @relation("TaskCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  assignments TaskAssignment[]
+
+  @@index([createdAt])
+  @@index([deadline, priority])
+}
+
+model TaskAssignment {
+  id              String                 @id @default(cuid())
+  taskId          String
+  type            AssignmentType
+  internId        String?
+  teamId          String?
+  teamLeadId      String?
+  status          AssignmentStatus       @default(ASSIGNED)
+  assignedAt      DateTime               @default(now())
+
+  // V1 stores the latest submission and latest review on the assignment itself.
+  // There is intentionally no submission-revision history in this version.
+  submissionUrl   String?                @db.VarChar(2048)
+  submissionNote  String?                @db.Text
+  submittedAt     DateTime?
+  reviewedById    String?
+  reviewFeedback  String?                @db.Text
+  reviewedAt      DateTime?
+  updatedAt       DateTime               @updatedAt
+
+  task            Task                   @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  intern          User?                  @relation("AssignedIntern", fields: [internId], references: [id], onDelete: Restrict)
+  team            Team?                  @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  teamLead        User?                  @relation("TeamLead", fields: [teamLeadId], references: [id], onDelete: Restrict)
+  reviewedBy      User?                  @relation("TaskReviewer", fields: [reviewedById], references: [id], onDelete: Restrict)
+  members         TaskAssignmentMember[]
+
+  @@unique([taskId, internId])
+  @@unique([taskId, teamId])
+  @@index([internId, status])
+  @@index([teamId, status])
+  @@index([teamLeadId])
+  @@index([status, assignedAt])
+}
+
+model TaskAssignmentMember {
+  id           String         @id @default(cuid())
+  assignmentId String
+  internId     String
+  assignedAt   DateTime       @default(now())
+
+  assignment   TaskAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  intern       User           @relation(fields: [internId], references: [id], onDelete: Restrict)
+
+  @@unique([assignmentId, internId])
+  @@index([internId, assignmentId])
+}
+
+model Attendance {
+  id         String           @id @default(cuid())
+  internId   String
+  workDate   DateTime         @db.Date
+  status     AttendanceStatus
+  note       String?          @db.VarChar(500)
+  markedById String
+  markedAt   DateTime         @default(now())
+  updatedAt  DateTime         @updatedAt
+
+  intern     User             @relation("InternAttendance", fields: [internId], references: [id], onDelete: Restrict)
+  markedBy   User             @relation("AttendanceMarker", fields: [markedById], references: [id], onDelete: Restrict)
+
+  @@unique([internId, workDate])
+  @@index([workDate, status])
+}
+
+model Meeting {
+  id          String           @id @default(cuid())
+  title       String
+  description String?          @db.Text
+  audience    MeetingAudience  @default(ALL_INTERNS)
+  status      MeetingStatus    @default(SCHEDULED)
+  teamId      String?
+  startsAt    DateTime
+  endsAt      DateTime
+  meetingUrl  String?          @db.VarChar(2048)
+  createdById String
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  team        Team?            @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  createdBy   User             @relation("MeetingCreator", fields: [createdById], references: [id], onDelete: Restrict)
+  attendance  MeetingAttendance[]
+
+  @@index([startsAt])
+  @@index([teamId])
+}
+
+model MeetingAttendance {
+  id         String                  @id @default(cuid())
+  meetingId  String
+  internId   String
+  status     MeetingAttendanceStatus @default(PENDING)
+  markedById String?
+  markedAt   DateTime?
+  updatedAt  DateTime                @updatedAt
+
+  meeting    Meeting                 @relation(fields: [meetingId], references: [id], onDelete: Cascade)
+  intern     User                    @relation("MeetingIntern", fields: [internId], references: [id], onDelete: Restrict)
+  markedBy   User?                   @relation("MeetingAttendanceMarker", fields: [markedById], references: [id], onDelete: Restrict)
+
+  @@unique([meetingId, internId])
+  @@index([internId, status])
+}
