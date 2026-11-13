@@ -1,6 +1,7 @@
+
 import { hash } from "bcryptjs";
 import { NextResponse } from "next/server";
-import { UserRole, UserStatus } from "@prisma/client";
+import { UserRole } from "@prisma/client";
 import { z } from "zod";
 import { requireRole } from "@/lib/auth";
 import { apiError, readJson, validationError } from "@/lib/http";
@@ -20,9 +21,24 @@ export async function GET() {
 
   const interns = await prisma.user.findMany({
     where: { role: UserRole.INTERN },
-    select: { id: true, name: true, email: true, internCode: true, position: true, status: true, team: { select: { id: true, name: true } }, createdAt: true },
+    select: {
+      id: true,
+      name: true,
+      email: true,
+      internCode: true,
+      position: true,
+      status: true,
+      team: {
+        select: {
+          id: true,
+          name: true,
+        },
+      },
+      createdAt: true,
+    },
     orderBy: [{ status: "asc" }, { name: "asc" }],
   });
+
   return NextResponse.json({ interns });
 }
 
@@ -35,6 +51,7 @@ export async function POST(request: Request) {
 
   const data = parsed.data;
   const passwordHash = await hash(data.temporaryPassword, 12);
+
   try {
     const intern = await prisma.user.create({
       data: {
@@ -45,13 +62,30 @@ export async function POST(request: Request) {
         passwordHash,
         role: UserRole.INTERN,
       },
-      select: { id: true, name: true, email: true, internCode: true, position: true, status: true },
+      select: {
+        id: true,
+        name: true,
+        email: true,
+        internCode: true,
+        position: true,
+        status: true,
+      },
     });
+
     return NextResponse.json({ intern }, { status: 201 });
   } catch (error) {
-    if (error && typeof error === "object" && "code" in error && error.code === "P2002") {
-      return apiError("An intern with this email or intern code already exists.", 409);
+    if (
+      error &&
+      typeof error === "object" &&
+      "code" in error &&
+      error.code === "P2002"
+    ) {
+      return apiError(
+        "An intern with this email or intern code already exists.",
+        409
+      );
     }
+
     throw error;
   }
 }

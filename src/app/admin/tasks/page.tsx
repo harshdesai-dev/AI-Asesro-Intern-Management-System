@@ -63,7 +63,7 @@ export default function TasksPage() {
   return <>
     <PageHeader eyebrow="WORK MANAGEMENT" title="Task management" description="Create individual work or shared team projects. Every team assignment gets its own Team Lead and a fixed assignment-time member list." action={<button className="button button-primary" onClick={() => setShowForm((value) => !value)}><Plus size={16} /> Create task</button>} />
     {error && <div className="alert alert-error">{error}</div>}{success && <div className="alert alert-success">{success}</div>}
-    {showForm && <section className="panel form-panel"><h2>Create and assign a task</h2><p>One task can be assigned to selected interns or one team. For a team task, choose the Team Lead from that team's active members.</p><form onSubmit={createTask}>
+    {showForm && <section className="panel form-panel"><h2>Create and assign a task</h2><p>One task can be assigned to selected interns or one team. For a team task, choose the Team Lead from that team&apos;s active members.</p><form onSubmit={createTask}>
       <div className="form-grid">
         <div className="form-field form-field-wide"><label htmlFor="task-title">Task / project title *</label><input id="task-title" className="form-control" minLength={3} value={form.title} onChange={(e) => setForm({ ...form, title: e.target.value })} required /></div>
         <div className="form-field form-field-wide"><label htmlFor="task-description">Description and expected outcome *</label><textarea id="task-description" className="form-control" value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required /></div>
