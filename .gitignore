@@ -3,9 +3,9 @@ node_modules/
 out/
 build/
 coverage/
-.env
-.env.local
-.env.*.local
+.env*
 !.env.example
 *.log
 .DS_Store
+# TypeScript incremental build cache
+tsconfig.tsbuildinfo
